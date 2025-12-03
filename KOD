@@ -1,0 +1,200 @@
+import random
+import string
+import os
+
+class Cell:
+    """ Inititerar klassen Cell, representerar en cell i spelplanen. Håller reda på synlig/dold"""
+    def __init__(self, ordet):
+        self.ordet = ordet
+        self.synligt = False
+
+    def visa(self):
+        self.synligt = True
+
+    def dölj(self):
+        self.synligt = False
+
+    def __str__(self):
+        if self.synligt:
+            return self.ordet
+        else:
+            return "----"
+
+class MemorySpel:
+    """ Inititerar klassen MemorySpel, hanterar logiken för spelplan, inläsing av ord och spelregler."""
+    def __init__(self, filnamn, storlek):
+        self.filnamn = filnamn
+        self.storlek = storlek
+        self.försök = 0
+        self.ordlista = self.läs_in_ord()
+        self.bräde = self.skapa_spelplan()
+
+    def läs_in_ord(self):
+        """ Funktion för att läsa in ord, arg: self, return: lista med ord (str)"""
+        lista_med_ord = []
+        try:
+            with open(self.filnamn, 'r', encoding='utf-8') as fil:
+                for rad in fil:
+                    rensad_rad = rad.strip()
+                    if rensad_rad:
+                        lista_med_ord.append(rensad_rad)
+            return lista_med_ord
+        except FileNotFoundError:
+            print("Grundläggande ordlista saknas")
+            exit()
+
+    def skapa_spelplan(self):
+        """ Slumpar ord, skapar spelplan, return:spelplan (matris) """
+        alla_ord = list(self.ordlista)
+        antal_rutor = self.storlek * self.storlek
+        antal_par = antal_rutor // 2
+
+        if len(alla_ord) < antal_par:
+            alla_ord = alla_ord * 5
+
+        random.shuffle(alla_ord)
+        valda_ord = alla_ord[:antal_par]
+
+        ord_par = valda_ord * 2
+        random.shuffle(ord_par)
+
+        spelplan = []
+        index = 0
+        for i in range(self.storlek):
+            rad_lista = []
+            for j in range(self.storlek):
+                ny_cell = Cell(ord_par[index]) 
+                rad_lista.append(ny_cell)
+                index += 1
+            spelplan.append(rad_lista)
+        return spelplan
+
+    def visa_bräde(self):
+        """ Visar spelbrädet"""
+        self.rensa_skärm()
+        print("\n   MEMORYBRÄDE")
+        bokstäver = string.ascii_uppercase[:self.storlek]
+
+        print("   ", end="")
+        for b in bokstäver:
+            print(f"{b:10}", end=" ")
+        print()
+
+        for i, rad in enumerate(self.bräde):
+            radnummer = i + 1
+            print(f"{radnummer:<2} ", end="")
+            for cell in rad:
+                print(f"{str(cell):10}", end=" ") 
+            print()
+        print()
+
+    def vänd_upp(self, koordinat):
+        """ Vänder upp en cell, arg: koordinat(tuple), en tuple (rad, kolumn)"""
+        rad, kol = koordinat
+        self.bräde[rad][kol].visa()
+
+    def vänd_ner(self, koordinat1, koordinat2):
+        """ Vänder ned två cell, arg: Koordinat 1 (tuple)
+                                 arg: Koordinat 2 (tuple)"""
+        r1, k1 = koordinat1
+        r2, k2 = koordinat2
+        self.bräde[r1][k1].dölj()
+        self.bräde[r2][k2].dölj()
+
+    def välj_cell(self, cell_namn):
+        """ Hanterar användar input för val av cell, arg: cell_namn (str), return vald koord (tuple)"""
+        while True:
+            svar = input(f"Välj {cell_namn} (t.ex. A1): ").strip()
+            svar = svar.upper()
+
+            if len(svar) >= 2:
+                try:
+                    bokstav = svar[0]
+                    siffra_text = svar[1:]
+
+                    kol = ord(bokstav) - 65
+                    rad = int(siffra_text) - 1
+
+                    if 0 <= rad < self.storlek and 0 <= kol < self.storlek:
+                        vald_cell = self.bräde[rad][kol]
+                        if vald_cell.synligt:
+                            print("Den rutan är redan synlig.")
+                        else:
+                            return (rad, kol)
+                    else:
+                        print("Koordinaterna är utanför brädet.")
+                except ValueError:
+                    print("Felaktigt format. Använd bokstav följt av siffra. (A1)")
+            else:
+                print("Skriv t.ex. A1")
+
+    def kontroll(self, koordinat1, koordinat2):
+        """ Jämförelse om två celler innehåller samma ord, arg: koord1 (tuple), koord 2(tuple) 
+        return: true/false (bool)"""
+        r1, k1 = koordinat1
+        r2, k2 = koordinat2
+        return self.bräde[r1][k1].ordet == self.bräde[r2][k2].ordet
+
+    def spel_klart(self):
+        """ Kontroll om samtiliga par hitttats. return: True om spelet är slut (bool)"""
+        for rad in self.bräde:
+            for cell in rad:
+                if not cell.synligt:
+                    return False
+        return True
+
+    def rensa_skärm(self):
+        os.system("clear")
+
+def huvudfunktion():
+    print("="*50)
+    print(" "*20 + "Memoryspel")
+    print("="*50)
+
+    while True:
+        try:
+            inmatning = input("Välj storlek (t.ex. 4): ")
+            storlek = int(inmatning)
+            antal_rutor = storlek * storlek
+
+            if antal_rutor % 2 == 0 and 9 >= storlek >= 0:
+                break
+            else:
+                print("Antalet rutor måste vara jämna och inom intervallet [2,8].")
+        except ValueError:
+            print("Ange ett heltal.")
+
+    spel = MemorySpel("memo.txt", storlek)
+
+    while not spel.spel_klart():
+        spel.visa_bräde()
+        spel.försök += 1
+        print(f"Försök nr: {spel.försök}")
+
+        c1 = spel.välj_cell("kort 1")
+        spel.vänd_upp(c1)
+        spel.visa_bräde()
+
+        c2 = spel.välj_cell("kort 2")
+        while c1 == c2:
+            print("Du måste välja en annan ruta.")
+            c2 = spel.välj_cell("kort 2")
+
+        spel.vänd_upp(c2)
+        spel.visa_bräde()
+
+        if spel.kontroll(c1, c2):
+            print(">>> MATCH! <<<")
+            input("Tryck ENTER för att fortsätta...")
+        else:
+            print(">>> Ingen match <<<")
+            input("Tryck ENTER för att fortsätta...")
+            spel.vänd_ner(c1, c2)
+
+        print("\n" + "-"*30)
+
+    spel.visa_bräde()
+    print(f"Grattis! Du klarade det på {spel.försök} försök!")
+
+if __name__ == "__main__":
+    huvudfunktion()
